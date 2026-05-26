@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Context Copilot — Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">AI</div>
+        <div>
+          <h1 data-i18n="headerTitle">AI Context Copilot</h1>
+          <p class="subtitle" data-i18n="headerSubtitle">划词 AI 上下文助手 · 设置中心</p>
+        </div>
+      </div>
+      <div class="lang-toggle">
+        <button type="button" class="lang-btn" data-lang="zh-CN" id="lang-zh">中</button>
+        <button type="button" class="lang-btn" data-lang="en" id="lang-en">EN</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- API 配置 -->
+      <section class="card">
+        <h2 class="card-title" data-i18n="apiSectionTitle">⚡ API 配置</h2>
+        <p class="card-desc" data-i18n="apiSectionDesc">选择模型平台并填写 API Key，支持 OpenAI、DeepSeek、Anthropic、Ollama 及任意兼容接口</p>
+
+        <form id="config-form">
+          <!-- 平台选择 -->
+          <div class="form-group">
+            <label for="provider" data-i18n="providerLabel">模型平台</label>
+            <select id="provider">
+              <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="ollama">Ollama（本地部署）</option>
+              <option value="openai-compat">OpenAI 兼容接口（OpenRouter / Groq / OneAPI / 中转站）</option>
+              <option value="custom">完全自定义</option>
+            </select>
+            <span class="hint" id="provider-hint" data-i18n="providerHintDefault">选择平台后自动填充 Base URL 和推荐模型</span>
+          </div>
+
+          <!-- API Key -->
+          <div class="form-group">
+            <label for="api-key" data-i18n="apiKeyLabel">API Key</label>
+            <div class="input-wrapper">
+              <input type="password" id="api-key" autocomplete="off"
+                     data-i18n-placeholder="apiKeyPlaceholder">
+              <button type="button" class="toggle-pwd" data-target="api-key" title="Show/Hide">👁</button>
+            </div>
+            <span class="hint" id="key-hint" data-i18n="apiKeyHint">你的 API Key 仅存储在浏览器本地，绝不会上传到任何第三方服务器</span>
+            <a href="#" id="docs-link" class="hint-link hidden" target="_blank" data-i18n="apiKeyDocsLink">📖 获取 API Key 指南</a>
+          </div>
+
+          <!-- Base URL -->
+          <div class="form-group" id="baseurl-group">
+            <label for="base-url" data-i18n="baseUrlLabel">Base URL</label>
+            <input type="text" id="base-url" placeholder="https://api.openai.com" autocomplete="off">
+          </div>
+
+          <!-- Endpoint -->
+          <div class="form-group hidden" id="endpoint-group">
+            <label for="endpoint" data-i18n="endpointLabel">Endpoint 路径</label>
+            <input type="text" id="endpoint" placeholder="/v1/chat/completions" autocomplete="off">
+            <span class="hint" data-i18n="endpointHint">相对于 Base URL 的 API 路径，或以 http 开头的完整 URL</span>
+          </div>
+
+          <!-- 模型名称 -->
+          <div class="form-group">
+            <label for="model" data-i18n="modelLabel">模型名称</label>
+            <div class="model-select-row">
+              <select id="model-select">
+                <option value="" data-i18n="modelSelectDefault">-- 选择模型 --</option>
+              </select>
+              <input type="text" id="model" autocomplete="off"
+                     data-i18n-placeholder="modelInputPlaceholder">
+            </div>
+            <span class="hint" data-i18n="modelHint">可从下拉列表中选择推荐模型，或直接手动输入</span>
+          </div>
+
+          <!-- 按钮 -->
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="save-btn">
+              <span class="btn-text" data-i18n="saveBtn">💾 保存配置</span>
+            </button>
+            <button type="button" class="btn btn-outline" id="test-btn">
+              <span class="btn-text" data-i18n="testBtn">🔌 测试连接</span>
+            </button>
+          </div>
+
+          <!-- 状态提示 -->
+          <div id="status-bar" class="status-bar hidden"></div>
+        </form>
+      </section>
+
+      <!-- 提示词模板 -->
+      <section class="card" id="templates-card">
+        <h2 class="card-title" data-i18n="templateSectionTitle">📋 提示词模板</h2>
+        <p class="card-desc" data-i18n="templateSectionDesc">配置多个模板，选中网页文本后可选其一来调用 AI。{{Text}} 会被替换为选中的文本</p>
+
+        <div id="templates-list"></div>
+
+        <button type="button" class="btn btn-outline" id="add-template-btn" style="margin-top:12px;" data-i18n="addTemplateBtn">
+          ＋ 添加模板
+        </button>
+      </section>
+
+      <!-- 隐私声明 -->
+      <section class="card privacy-card">
+        <div class="privacy-icon">🔒</div>
+        <h2 class="privacy-title" data-i18n="privacyTitle">100% 隐私保护承诺</h2>
+        <p class="privacy-text" data-i18n="privacyText">
+          本插件 <strong>不依赖任何自建后端服务器</strong>，所有代码均为纯前端驱动。
+        </p>
+        <ul class="privacy-list">
+          <li data-i18n="privacyItem1">你的 <strong>API Key</strong> 仅存储在浏览器本地 <code>chrome.storage.local</code> 中</li>
+          <li data-i18n="privacyItem2">AI 请求直接在你的浏览器与 API 服务商之间点对点通信</li>
+          <li data-i18n="privacyItem3"><strong>不经过</strong>任何中间代理或第三方服务器</li>
+          <li data-i18n="privacyItem4">不会收集、上传或分享你的浏览数据、选中文本或对话内容</li>
+          <li data-i18n="privacyItem5">所有源代码均可审查，无混淆、无远程代码注入</li>
+        </ul>
+        <div class="privacy-badge" data-i18n="privacyBadge">
+          你的数据，永远属于你。
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>AI Context Copilot</span>
+      <span>·</span>
+      <span data-i18n="footerVersion">v2.0.0</span>
+      <span>·</span>
+      <span data-i18n="footerManifestV3">Manifest V3</span>
+      <span>·</span>
+      <span data-i18n="footerTagline">多模型接入</span>
+    </footer>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="providers.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
