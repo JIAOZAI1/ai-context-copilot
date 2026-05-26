@@ -6,6 +6,8 @@ A pure frontend Chrome extension for AI-powered text assistance. Select any text
 
 ---
 
+<a id="english"></a>
+
 ## English
 
 ### Core Features
@@ -148,6 +150,8 @@ ai-context-copilot/
 MIT
 
 ---
+
+<a id="chinese"></a>
 
 ## 中文
 
