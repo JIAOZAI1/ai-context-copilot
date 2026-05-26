@@ -49,7 +49,9 @@ body {
 
 /* ---------- Header ---------- */
 .header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 36px;
 }
 .logo {
@@ -82,6 +84,35 @@ body {
   font-size: 14px;
   color: var(--gray-400);
   margin-top: 2px;
+}
+
+/* Header right area */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--gray-900);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.header-github-link:hover {
+  background: #1a1a2e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.header-github-link .github-icon {
+  flex-shrink: 0;
 }
 
 /* Language toggle */
