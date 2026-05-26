@@ -150,6 +150,19 @@
       return;
     }
 
+    // ---------- 配额检查 ----------
+    try {
+      const quota = await checkAndUseQuota();
+      if (!quota.allowed) {
+        showStatus('error', `Daily limit reached (${quota.used}/${quota.limit}). Upgrade for unlimited access.`);
+        return;
+      }
+    } catch (err) {
+      showStatus('error', 'Unable to verify usage quota. Please try again.');
+      return;
+    }
+    // ---------- 配额检查结束 ----------
+
     testBtn.disabled = true;
     testBtn.querySelector('.btn-text').innerHTML =
       `<span class="spinner"></span>${t('testBtnLoading')}`;
@@ -440,9 +453,77 @@
     renderTemplates();
   });
 
+  // ========== License 信息卡片 ==========
+  const licenseInfo = $('#license-info');
+
+  async function loadLicenseInfo() {
+    const info = await getQuotaInfo();
+    const paid = info.paid;
+    const used = info.used;
+    const limit = info.limit;
+    const remaining = info.remaining;
+
+    const planBadge = paid
+      ? `<span style="background:#ecfdf5;color:#059669;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;">${t('planLifetime')}</span>`
+      : `<span style="background:#eef2ff;color:#6366f1;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;">${t('planFree')}</span>`;
+
+    const usageBar = paid
+      ? `<div style="text-align:center;font-size:13px;color:#64748b;">🎉 Unlimited generations — enjoy!</div>`
+      : `<div style="margin-top:12px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:4px;">
+            <span>${t('usageLabel')}</span>
+            <span><strong>${used}</strong> / ${limit}</span>
+          </div>
+          <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(100, (used / limit) * 100)}%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:3px;transition:width 0.3s;"></div>
+          </div>
+          <div style="margin-top:6px;font-size:12px;color:#94a3b8;">${remaining} ${currentLang === 'en' ? 'remaining today' : '次剩余'}</div>
+        </div>
+        <button id="upgrade-btn" style="
+          display:block;width:100%;margin-top:14px;
+          padding:10px 0;border:none;border-radius:8px;
+          background:linear-gradient(135deg,#6366f1,#4f46e5);
+          color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+          box-shadow:0 2px 8px rgba(99,102,241,0.3);
+        ">${t('upgradeBtn')}</button>`;
+
+    licenseInfo.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        ${planBadge}
+        <button id="refresh-license-btn" style="
+          background:none;border:1px solid #e2e8f0;border-radius:6px;
+          padding:4px 10px;font-size:12px;color:#64748b;cursor:pointer;
+        ">${t('refreshBtn')}</button>
+      </div>
+      ${usageBar}
+    `;
+
+    // 绑定事件
+    $('#refresh-license-btn')?.addEventListener('click', () => {
+      licenseInfo.innerHTML = '<div class="license-loading">...</div>';
+      // 强制刷新付费状态
+      chrome.runtime.sendMessage({ type: 'refresh-payment-status' }, () => {
+        loadLicenseInfo();
+      });
+    });
+
+    const upgradeBtn = $('#upgrade-btn');
+    if (upgradeBtn) {
+      upgradeBtn.addEventListener('click', () => openPaymentPage());
+    }
+  }
+
+  // 支付完成后刷新 License 卡片
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'payment-completed') {
+      loadLicenseInfo();
+    }
+  });
+
   // ========== 初始化 ==========
   initI18n();
   updateLangToggle();
   loadConfig();
   loadTemplates();
+  loadLicenseInfo();
 })();

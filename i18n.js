@@ -76,8 +76,23 @@ const I18N = {
     privacyItem5: '所有源代码均可审查，无混淆、无远程代码注入',
     privacyBadge: '你的数据，永远属于你。',
 
+    // 付费
+    paywallTitle: '已达每日限额',
+    paywallDesc: '今天已使用 {used}/{limit} 次免费额度',
+    paywallHint: '每日 0 点自动重置 · 或购买终身授权畅享无限',
+    paywallBtn: '解锁无限使用',
+    paywallSuccessTitle: '购买成功！',
+    paywallSuccessDesc: '已解锁无限使用权限，请重试。',
+    paywallSuccessDismiss: '知道了',
+    licenseTitle: '⚡ 使用计划',
+    planFree: '免费计划',
+    planLifetime: '终身授权',
+    usageLabel: '今日已用',
+    upgradeBtn: '升级为终身授权',
+    refreshBtn: '刷新状态',
+
     // 页脚
-    footerVersion: 'v2.0.0',
+    footerVersion: 'v1.0.0',
     footerManifestV3: 'Manifest V3',
     footerTagline: '多模型接入'
   },
@@ -154,8 +169,23 @@ const I18N = {
     privacyItem5: 'All source code is open for audit — no obfuscation, no remote code injection',
     privacyBadge: 'Your data stays yours. Always.',
 
+    // Payment
+    paywallTitle: 'Daily Limit Reached',
+    paywallDesc: "You've used {used}/{limit} free generations today",
+    paywallHint: 'Resets at midnight · Or upgrade for unlimited use',
+    paywallBtn: 'Unlock Unlimited',
+    paywallSuccessTitle: 'Purchase Successful!',
+    paywallSuccessDesc: 'You now have unlimited access. Please try again.',
+    paywallSuccessDismiss: 'Got it',
+    licenseTitle: '⚡ Plan',
+    planFree: 'Free Plan',
+    planLifetime: 'Lifetime License',
+    usageLabel: "Today's usage",
+    upgradeBtn: 'Upgrade to Lifetime',
+    refreshBtn: 'Refresh',
+
     // Footer
-    footerVersion: 'v2.0.0',
+    footerVersion: 'v1.0.0',
     footerManifestV3: 'Manifest V3',
     footerTagline: 'Multi-Model Support'
   }

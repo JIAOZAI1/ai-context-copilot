@@ -191,6 +191,33 @@
       return;
     }
 
+    // ---------- 配额检查 ----------
+    try {
+      const quota = await checkAndUseQuota();
+      if (!quota.allowed) {
+        appendMessageBubble('assistant', '', conversationHistory.length);
+        const bubbles = messagesEl.querySelectorAll('.message.assistant');
+        const lastBubble = bubbles[bubbles.length - 1];
+        if (lastBubble) {
+          const contentEl = lastBubble.querySelector('.msg-content');
+          contentEl.innerHTML = getPaywallHTML(quota);
+          contentEl.querySelector('.paywall-unlock-btn')?.addEventListener('click', () => openPaymentPage());
+        }
+        scrollToBottom();
+        return;
+      }
+    } catch (err) {
+      console.warn('Quota check failed:', err);
+      appendMessageBubble('assistant',
+        '⚠️ Unable to verify usage quota. Please check your internet connection and try again.',
+        conversationHistory.length
+      );
+      conversationHistory.push({ role: 'assistant', content: '⚠️ Quota verification failed.' });
+      saveHistory();
+      return;
+    }
+    // ---------- 配额检查结束 ----------
+
     // 添加用户消息
     conversationHistory.push({ role: 'user', content: userText });
     appendMessageBubble('user', userText, conversationHistory.length - 1);
@@ -354,6 +381,13 @@
       sendMessage(`请帮我解释以下文本：\n\n"""\n${message.text}\n"""`);
     } else if (message.type === 'query-from-page' && message.text) {
       sendMessage(`请帮我解释以下文本（来自 ${message.pageUrl || '网页'}）：\n\n"""\n${message.text}\n"""`);
+    } else if (message.type === 'payment-completed') {
+      const successTitle = (typeof t === 'function') ? t('paywallSuccessTitle') : 'Purchase Successful!';
+      const successDesc = (typeof t === 'function') ? t('paywallSuccessDesc') : 'You now have unlimited access.';
+      conversationHistory.push({ role: 'assistant', content: `🎉 ${successTitle}\n\n${successDesc}` });
+      appendMessageBubble('assistant', `🎉 ${successTitle}\n\n${successDesc}`, conversationHistory.length - 1);
+      saveHistory();
+      scrollToBottom();
     }
   });
 

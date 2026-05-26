@@ -239,6 +239,22 @@
       return;
     }
 
+    // ---------- 配额检查 ----------
+    try {
+      const quota = await checkAndUseQuota();
+      if (!quota.allowed) {
+        answerArea.innerHTML = getPaywallHTML(quota);
+        const unlockBtn = answerArea.querySelector('.paywall-unlock-btn');
+        if (unlockBtn) unlockBtn.addEventListener('click', () => openPaymentPage());
+        return;
+      }
+    } catch (err) {
+      console.warn('Quota check failed, assuming exceeded:', err);
+      answerArea.innerHTML = getPaywallHTML({ allowed: false, reason: 'error', used: DAILY_LIMIT, limit: DAILY_LIMIT });
+      return;
+    }
+    // ---------- 配额检查结束 ----------
+
     abortController = new AbortController();
     isStreaming = true;
 
@@ -324,5 +340,30 @@
   document.addEventListener('scroll', () => {
     removeTemplateBar();
   }, { capture: true, passive: true });
+
+  // 监听支付完成事件，更新已显示的付费墙
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'payment-completed') {
+      const paywall = document.querySelector('.aicc-paywall');
+      if (paywall) {
+        const successTitle = (typeof t === 'function') ? t('paywallSuccessTitle') : 'Purchase Successful!';
+        const successDesc = (typeof t === 'function') ? t('paywallSuccessDesc') : 'You now have unlimited access. Please try again.';
+        const dismissLabel = (typeof t === 'function') ? t('paywallSuccessDismiss') : 'Got it';
+        paywall.innerHTML = `
+          <div style="text-align:center;padding:40px 24px;">
+            <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+            <h3 style="font-size:18px;font-weight:700;color:#1e293b;margin:0 0 8px 0;">${successTitle}</h3>
+            <p style="font-size:14px;color:#64748b;margin:0 0 20px 0;">${successDesc}</p>
+            <button id="aicc-paywall-close" style="
+              padding:10px 24px;border-radius:8px;
+              border:1px solid #e2e8f0;background:#fff;color:#475569;
+              font-size:13px;cursor:pointer;
+            ">${dismissLabel}</button>
+          </div>
+        `;
+        document.getElementById('aicc-paywall-close')?.addEventListener('click', () => removeCard());
+      }
+    }
+  });
 
 })();

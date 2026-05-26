@@ -21,9 +21,14 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["providers.js", "content.js"],
+      "js": ["providers.js", "quota.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_end"
+    },
+    {
+      "matches": ["https://extensionpay.com/*"],
+      "js": ["ExtPay.js"],
+      "run_at": "document_start"
     }
   ],
   "background": {
