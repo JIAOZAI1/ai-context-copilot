@@ -412,6 +412,15 @@ body {
   color: var(--gray-300);
   margin-top: 8px;
 }
+.github-link {
+  color: var(--gray-400);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+.github-link:hover {
+  color: var(--primary);
+}
 
 /* ---------- Spinner ---------- */
 @keyframes spin {
