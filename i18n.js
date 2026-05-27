@@ -26,6 +26,7 @@ const I18N = {
     apiKeyHint: '你的 API Key 仅存储在浏览器本地，绝不会上传到任何第三方服务器',
     apiKeyHintOllama: '本地部署通常无需填写',
     apiKeyHintAnthropic: 'sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxx',
+    apiKeyHintGemini: 'AIzaSy... Google AI Studio API Key',
     apiKeyDocsLink: '📖 获取 API Key 指南',
 
     // Base URL
@@ -114,6 +115,7 @@ const I18N = {
     apiKeyHint: 'Your API Key is stored only in your local browser, never uploaded to any third-party server.',
     apiKeyHintOllama: 'Usually not required for local deployment',
     apiKeyHintAnthropic: 'sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxx',
+    apiKeyHintGemini: 'AIzaSy... Google AI Studio API Key',
     apiKeyDocsLink: '📖 Get API Key Guide',
 
     // Base URL

@@ -1,6 +1,6 @@
 // ============================================
 // AI Context Copilot — Provider Registry
-// 多模型接入：OpenAI / DeepSeek / Anthropic / Ollama / 自定义
+// 多模型接入：OpenAI / DeepSeek / Anthropic / Gemini / Ollama / 自定义
 // ============================================
 
 const AI_PROVIDERS = {
@@ -156,6 +156,88 @@ const AI_PROVIDERS = {
     }
   },
 
+  // ---------- Google Gemini ----------
+  'gemini': {
+    id: 'gemini',
+    name: 'Google Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com',
+    endpoint: '/v1beta/models/{model}:generateContent',
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+    docsUrl: 'https://aistudio.google.com/apikey',
+
+    // Gemini 将 API Key 嵌入 URL 查询参数，无 Authorization header
+    buildUrl(baseUrl, model, apiKey, stream) {
+      // 重置流式文本缓存
+      this._lastTextLength = 0;
+
+      const action = stream ? 'streamGenerateContent' : 'generateContent';
+      const url = `${baseUrl}/v1beta/models/${model}:${action}`;
+      const params = [];
+      if (apiKey) params.push(`key=${encodeURIComponent(apiKey)}`);
+      if (stream) params.push('alt=sse');
+      return params.length ? `${url}?${params.join('&')}` : url;
+    },
+
+    getHeaders(apiKey) {
+      return { 'Content-Type': 'application/json' };
+    },
+
+    // Gemini uses contents array + systemInstruction (not messages)
+    buildBody(model, messages, stream, maxTokens) {
+      const systemMsg = messages.find(m => m.role === 'system');
+      const conversation = messages.filter(m => m.role !== 'system');
+
+      const contents = conversation.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+      const body = {
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: maxTokens || 4096
+        }
+      };
+
+      if (systemMsg) {
+        body.systemInstruction = {
+          parts: [{ text: systemMsg.content }]
+        };
+      }
+
+      return JSON.stringify(body);
+    },
+
+    // Gemini SSE 每个 chunk 包含完整累积文本（非增量），需自行计算 delta
+    parseStreamLine(line) {
+      if (!line.startsWith('data: ')) return null;
+      const data = line.slice(6);
+      try {
+        const json = JSON.parse(data);
+        const candidate = json.candidates?.[0];
+        if (!candidate) return null;
+        const fullText = candidate.content?.parts?.[0]?.text || '';
+        const delta = fullText.slice(this._lastTextLength || 0);
+        this._lastTextLength = fullText.length;
+        if (candidate.finishReason === 'STOP') {
+          this._lastTextLength = 0;
+          return delta ? { content: delta, done: true } : { done: true };
+        }
+        return delta ? { content: delta } : null;
+      } catch (_) { return null; }
+    },
+
+    async checkError(response) {
+      if (!response.ok) {
+        const text = await response.text();
+        let msg = `HTTP ${response.status}`;
+        try { msg = JSON.parse(text).error?.message || msg; } catch (_) {}
+        throw new Error(msg);
+      }
+    }
+  },
+
   // ---------- Ollama (本地模型) ----------
   'ollama': {
     id: 'ollama',
@@ -261,7 +343,7 @@ const AI_PROVIDERS = {
     getHeaders(apiKey) {
       return {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `${apiKey}`
       };
     },
 
@@ -312,85 +394,80 @@ function listProviders() {
 }
 
 // ---------- 通用流式请求 ----------
+// 通过 background service worker 代理，避免 content script / side panel 的 CORS 限制
 async function streamAIRequest(providerId, config, messages, onChunk, onDone, onError, signal) {
   const provider = getProvider(providerId);
   const baseUrl = (config.baseUrl || provider.baseUrl).replace(/\/$/, '');
   const endpoint = config.endpoint || provider.endpoint;
   const apiKey = config.apiKey || '';
 
-  // 支持 provider 自定义 URL 构建（如 Gemini 将 API Key 和 model 嵌入 URL）
   let url;
   if (provider.buildUrl) {
-    url = provider.buildUrl(baseUrl, config.model, apiKey);
+    url = provider.buildUrl(baseUrl, config.model, apiKey, true);
   } else {
     url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
   }
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: provider.getHeaders(apiKey),
-      body: provider.buildBody(config.model, messages, true, config.maxTokens),
-      signal
+  return new Promise((resolve) => {
+    let completed = false;
+
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      try { port.disconnect(); } catch (_) { /* already closed */ }
+      resolve();
+    };
+
+    let port;
+    try {
+      port = chrome.runtime.connect({ name: 'api-proxy-stream' });
+    } catch (err) {
+      onError(err);
+      return resolve();
+    }
+
+    port.onMessage.addListener((msg) => {
+      if (msg.type === 'line') {
+        const result = provider.parseStreamLine(msg.line);
+        if (result) {
+          if (result.content) onChunk(result.content);
+          if (result.done) { onDone(); finish(); }
+        }
+      } else if (msg.type === 'done') {
+        onDone();
+        finish();
+      } else if (msg.type === 'error') {
+        onError(new Error(msg.message));
+        finish();
+      }
     });
 
-    await provider.checkError(response);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Ollama 使用 NDJSON，按完整行解析
-      if (providerId === 'ollama') {
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          const result = provider.parseStreamLine(trimmed);
-          if (result) {
-            if (result.done) { onDone(); return; }
-            if (result.content) onChunk(result.content);
-          }
-        }
-      } else {
-        // OpenAI / Anthropic 使用 SSE 格式
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        let currentEvent = '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-
-          // 跟踪 SSE event 类型（Anthropic 需要，OpenAI 忽略）
-          if (trimmed.startsWith('event: ')) {
-            currentEvent = trimmed.slice(7);
-            continue;
-          }
-
-          if (!trimmed.startsWith('data: ')) continue;
-
-          const result = provider.parseStreamLine(trimmed);
-          if (result) {
-            if (result.done) { onDone(); return; }
-            if (result.content) onChunk(result.content);
-          }
-        }
+    port.onDisconnect.addListener(() => {
+      if (!completed) {
+        completed = true;
+        onError(new Error('Background connection lost'));
+        resolve();
       }
+    });
+
+    // 支持 AbortController 取消请求
+    if (signal) {
+      if (signal.aborted) {
+        onDone();
+        return finish();
+      }
+      signal.addEventListener('abort', () => {
+        try { port.postMessage({ type: 'abort' }); } catch (_) {}
+        onDone();
+        finish();
+      }, { once: true });
     }
 
-    onDone();
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      onDone();
-    } else {
-      onError(err);
-    }
-  }
+    port.postMessage({
+      type: 'start',
+      url,
+      headers: provider.getHeaders(apiKey),
+      body: provider.buildBody(config.model, messages, true, config.maxTokens)
+    });
+  });
 }

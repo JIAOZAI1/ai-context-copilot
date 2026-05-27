@@ -44,6 +44,103 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }, 500);
     });
     sendResponse({ success: true });
+    return true;
   }
-  return true;
+
+  // API 代理（非流式，用于连接测试）—— background 不受 CORS 限制
+  if (message.type === 'api-proxy') {
+    (async () => {
+      try {
+        const response = await fetch(message.url, {
+          method: 'POST',
+          headers: message.headers,
+          body: message.body
+        });
+        const text = await response.text();
+        sendResponse({ ok: response.ok, status: response.status, body: text });
+      } catch (err) {
+        sendResponse({ error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  return false;
 });
+
+// API 代理（流式，用于 AI 请求）—— background 不受 CORS 限制
+{
+  const activeStreams = new Map();
+  let streamIdCounter = 0;
+
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'api-proxy-stream') return;
+
+    let abortController = null;
+    let streamId = null;
+
+    port.onMessage.addListener(async (msg) => {
+      if (msg.type === 'start') {
+        streamId = ++streamIdCounter;
+        abortController = new AbortController();
+        activeStreams.set(streamId, abortController);
+
+        try {
+          const response = await fetch(msg.url, {
+            method: 'POST',
+            headers: msg.headers,
+            body: msg.body,
+            signal: abortController.signal
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            port.postMessage({ type: 'error', message: `HTTP ${response.status}: ${text.substring(0, 200)}` });
+            return;
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed) {
+                port.postMessage({ type: 'line', line: trimmed });
+              }
+            }
+          }
+
+          if (buffer.trim()) {
+            port.postMessage({ type: 'line', line: buffer.trim() });
+          }
+
+          port.postMessage({ type: 'done' });
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            port.postMessage({ type: 'done' });
+          } else {
+            port.postMessage({ type: 'error', message: err.message });
+          }
+        } finally {
+          if (streamId != null) activeStreams.delete(streamId);
+        }
+      } else if (msg.type === 'abort') {
+        if (abortController) abortController.abort();
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      if (abortController) abortController.abort();
+      if (streamId != null) activeStreams.delete(streamId);
+    });
+  });
+}

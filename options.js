@@ -42,6 +42,11 @@
       baseUrlGroup.classList.add('hidden');
       endpointGroup.classList.remove('hidden');
       providerHint.textContent = t('providerHintCustom');
+    } else if (providerId === 'gemini') {
+      baseUrlGroup.classList.remove('hidden');
+      endpointGroup.classList.add('hidden');
+      baseUrlInput.value = currentProvider.baseUrl;
+      providerHint.textContent = t('providerHintGeneric', { name: currentProvider.name });
     } else if (providerId === 'ollama') {
       baseUrlGroup.classList.remove('hidden');
       endpointGroup.classList.add('hidden');
@@ -60,6 +65,8 @@
       apiKeyInput.placeholder = t('apiKeyHintOllama');
     } else if (providerId === 'anthropic') {
       apiKeyInput.placeholder = t('apiKeyHintAnthropic');
+    } else if (providerId === 'gemini') {
+      apiKeyInput.placeholder = t('apiKeyHintGemini');
     } else {
       apiKeyInput.placeholder = t('apiKeyPlaceholder');
     }
@@ -162,21 +169,30 @@
 
       let url;
       if (provider.buildUrl) {
-        url = provider.buildUrl(baseUrl, config.model, config.apiKey);
+        url = provider.buildUrl(baseUrl, config.model, config.apiKey, false);
       } else {
         url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
+      // 通过 background service worker 代理请求，避免 CORS 限制
+      const proxyResponse = await chrome.runtime.sendMessage({
+        type: 'api-proxy',
+        url,
         headers: provider.getHeaders(config.apiKey),
         body: provider.buildBody(config.model, [
           { role: 'user', content: 'Hi, reply with just: OK' }
         ], false, 20)
       });
 
-      await provider.checkError(response);
-      const data = await response.json();
+      if (proxyResponse.error) {
+        throw new Error(proxyResponse.error);
+      }
+
+      if (!proxyResponse.ok) {
+        throw new Error(`HTTP ${proxyResponse.status}: ${proxyResponse.body.substring(0, 200)}`);
+      }
+
+      const data = JSON.parse(proxyResponse.body);
 
       let reply = '(empty)';
       if (data.choices?.[0]?.message?.content) {
@@ -185,6 +201,8 @@
         reply = data.content[0].text;
       } else if (data.message?.content) {
         reply = data.message.content;
+      } else if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        reply = data.candidates[0].content.parts[0].text;
       }
 
       showStatus('success', t('statusSuccess', { model: config.model, reply }));
