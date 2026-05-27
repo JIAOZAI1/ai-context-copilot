@@ -35,6 +35,223 @@
     });
   }
 
+  // ---------- 模板卡片 ----------
+  async function loadTemplateCards() {
+    chrome.storage.local.get(['templates'], (items) => {
+      const allTemplates = items.templates || [];
+      const cardTemplates = allTemplates.filter(t => t.generateCard);
+      const section = $('#template-cards-section');
+      const list = $('#template-cards-list');
+
+      if (cardTemplates.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      list.innerHTML = cardTemplates.map(tpl => {
+        // 生成缩略提示词文本（去掉变量标记，显示纯文本概要）
+        const snippet = (tpl.prompt || '')
+          .replace(/\{\{\w+\}\}/g, '___')
+          .replace(/\n+/g, ' ')
+          .substring(0, 80);
+        return `
+        <div class="template-card" data-id="${escapeHtml(tpl.id)}" style="border-top: 3px solid ${escapeHtml(tpl.color || '#6366f1')}">
+          <div class="template-card-top">
+            <div class="template-card-icon" style="background:${escapeHtml(tpl.color || '#6366f1')}">${escapeHtml((tpl.name || '?')[0])}</div>
+            <span class="template-card-name">${escapeHtml(tpl.name || '')}</span>
+          </div>
+          <div class="template-card-snippet">${escapeHtml(snippet)}</div>
+        </div>
+      `}).join('');
+
+      // 绑定卡片点击事件
+      list.querySelectorAll('.template-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          const tplId = card.dataset.id;
+          const tpl = cardTemplates.find(t => t.id === tplId);
+          if (tpl) openTemplateForm(tpl);
+        });
+      });
+    });
+  }
+
+  function parseTemplateVariables(prompt) {
+    const vars = [];
+    const seen = new Set();
+    const regex = /\{\{(\w+)\}\}/g;
+    let match;
+    while ((match = regex.exec(prompt)) !== null) {
+      const name = match[1].trim();
+      if (!seen.has(name)) {
+        seen.add(name);
+        vars.push(name);
+      }
+    }
+    return vars;
+  }
+
+  function buildFilledPrompt(template) {
+    const fields = document.querySelectorAll('#template-form-body [data-var]');
+    let filled = template.prompt;
+    fields.forEach((field) => {
+      const val = field.value || '';
+      const regex = new RegExp('\\{\\{' + field.dataset.var + '\\}\\}', 'gi');
+      filled = filled.replace(regex, val || `{{${field.dataset.var}}}`);
+    });
+    return filled;
+  }
+
+  function updateFormPreview() {
+    const overlay = $('#template-form-overlay');
+    const template = overlay._template;
+    if (!template) return;
+    const previewContent = $('#template-form-preview').querySelector('.template-form-preview-content');
+    if (!previewContent) return;
+    const filled = buildFilledPrompt(template);
+    // Highlight variable placeholders that are still unfilled
+    const html = filled
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\{\{(\w+)\}\}/g, '<mark class="preview-var">$1</mark>');
+    previewContent.innerHTML = html;
+  }
+
+  function openTemplateForm(template) {
+    const overlay = $('#template-form-overlay');
+    const formTitle = $('#template-form-title');
+    const formBody = $('#template-form-body');
+
+    formTitle.textContent = template.name || '填写提示词变量';
+    const variables = parseTemplateVariables(template.prompt);
+
+    let fieldsHtml = '';
+
+    if (variables.length === 0) {
+      fieldsHtml = '<p class="template-form-empty">该模板没有可填写的变量，将直接发送提示词。</p>';
+    }
+
+    variables.forEach((varName) => {
+      if (varName === 'current_url') {
+        fieldsHtml += `
+          <div class="template-form-field readonly">
+            <label>🌐 ${escapeHtml(varName)} <span class="field-hint">（自动获取当前页面 URL）</span></label>
+            <input type="text" data-var="${escapeHtml(varName)}" value="" readonly placeholder="正在获取...">
+          </div>
+        `;
+      } else if (varName === 'current_text' || varName === 'Text') {
+        fieldsHtml += `
+          <div class="template-form-field">
+            <label>📝 ${escapeHtml(varName)} <span class="field-hint">（选中文本或手动输入）</span></label>
+            <textarea data-var="${escapeHtml(varName)}" rows="4" placeholder="请在此粘贴或输入文本内容..."></textarea>
+          </div>
+        `;
+      } else if (varName === 'current_page') {
+        fieldsHtml += `
+          <div class="template-form-field readonly">
+            <label>📄 ${escapeHtml(varName)} <span class="field-hint">（自动获取当前页面内容）</span></label>
+            <textarea data-var="${escapeHtml(varName)}" rows="6" readonly placeholder="正在获取页面内容..."></textarea>
+          </div>
+        `;
+      } else {
+        fieldsHtml += `
+          <div class="template-form-field">
+            <label>${escapeHtml(varName)}</label>
+            <input type="text" data-var="${escapeHtml(varName)}" placeholder="请输入 ${escapeHtml(varName)}">
+          </div>
+        `;
+      }
+    });
+
+    formBody.innerHTML = fieldsHtml;
+    overlay._template = template;
+    overlay.classList.remove('hidden');
+
+    // 绑定输入事件，实时更新预览
+    formBody.querySelectorAll('[data-var]').forEach((field) => {
+      field.addEventListener('input', updateFormPreview);
+    });
+
+    // 自动获取当前页面 URL（获取后更新预览）
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      const urlInput = formBody.querySelector('[data-var="current_url"]');
+      if (urlInput && tab?.url) {
+        urlInput.value = tab.url;
+        updateFormPreview();
+      }
+    });
+
+    // 尝试获取页面选中文本（获取后更新预览）
+    tryGetSelectedText((text) => {
+      const textInput = formBody.querySelector('[data-var="current_text"], [data-var="Text"]');
+      if (textInput && text) {
+        textInput.value = text;
+        updateFormPreview();
+      }
+    });
+
+    // 自动获取页面内容（获取后更新预览）
+    tryGetPageContent((content) => {
+      const pageInput = formBody.querySelector('[data-var="current_page"]');
+      if (pageInput && content) {
+        pageInput.value = content;
+        updateFormPreview();
+      }
+    });
+
+    // 初始预览
+    updateFormPreview();
+  }
+
+  function tryGetSelectedText(callback) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (!tab) { callback(''); return; }
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => window.getSelection()?.toString()?.trim() || ''
+      }, (results) => {
+        callback(results?.[0]?.result || '');
+      });
+    });
+  }
+
+  function tryGetPageContent(callback) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (!tab) { callback(''); return; }
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => (document.body?.innerText || '').substring(0, 15000)
+      }, (results) => {
+        callback(results?.[0]?.result || '');
+      });
+    });
+  }
+
+  function closeTemplateForm() {
+    const overlay = $('#template-form-overlay');
+    overlay.classList.add('hidden');
+    overlay._template = null;
+  }
+
+  function submitTemplateForm() {
+    const overlay = $('#template-form-overlay');
+    const template = overlay._template;
+    if (!template) return;
+
+    let filledPrompt = buildFilledPrompt(template);
+    // 清理仍未填充的变量标记
+    filledPrompt = filledPrompt.replace(/\{\{\w+\}\}/g, '');
+
+    if (!filledPrompt.trim()) {
+      filledPrompt = template.prompt;
+    }
+
+    closeTemplateForm();
+    sendMessage(filledPrompt);
+  }
+
   // ---------- 配置 ----------
   async function getConfig() {
     const defaults = {
@@ -264,6 +481,12 @@
   }
 
   // ---------- UI 辅助 ----------
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
   function scrollToBottom() {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -357,13 +580,31 @@
     }
   });
 
+  // ---------- 模板表单按钮事件 ----------
+  const formCloseBtn = $('#template-form-close-btn');
+  const formCancelBtn = $('#template-form-cancel-btn');
+  const formSubmitBtn = $('#template-form-submit-btn');
+  const formOverlay = $('#template-form-overlay');
+
+  formCloseBtn.addEventListener('click', closeTemplateForm);
+  formCancelBtn.addEventListener('click', closeTemplateForm);
+  formSubmitBtn.addEventListener('click', submitTemplateForm);
+
+  formOverlay.addEventListener('click', (e) => {
+    if (e.target === formOverlay) closeTemplateForm();
+  });
+
   // ---------- 初始化 ----------
   updateModelBadge();
   loadHistory();
+  loadTemplateCards();
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.apiKey || changes.model || changes.baseUrl || changes.provider) {
       updateModelBadge();
+    }
+    if (changes.templates) {
+      loadTemplateCards();
     }
   });
 

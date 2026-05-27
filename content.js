@@ -49,12 +49,12 @@
 
   async function getTemplates() {
     const defaults = [
-      { id: 'explain', name: '解释', color: '#6366f1', prompt: '请帮我详细解释以下文本的含义和背景：\n\n"""\n{{Text}}\n"""' },
-      { id: 'summarize', name: '总结', color: '#10b981', prompt: '请用简洁的要点列表总结以下文本的核心内容：\n\n"""\n{{Text}}\n"""' },
-      { id: 'translate', name: '翻译', color: '#06b6d4', prompt: '请将以下文本翻译成流畅自然的中文：\n\n"""\n{{Text}}\n"""' },
-      { id: 'polish', name: '润色', color: '#8b5cf6', prompt: '请帮我润色改进以下文本，使表达更加流畅专业：\n\n"""\n{{Text}}\n"""' },
-      { id: 'analyze', name: '分析', color: '#f59e0b', prompt: '请从多个维度深度分析以下文本：\n\n"""\n{{Text}}\n"""' },
-      { id: 'chat', name: '对话', color: '#ec4899', prompt: '{{Text}}' }
+      { id: 'explain', name: '解释', color: '#6366f1', prompt: '请帮我详细解释以下文本的含义和背景：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+      { id: 'summarize', name: '总结', color: '#10b981', prompt: '请用简洁的要点列表总结以下文本的核心内容：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+      { id: 'translate', name: '翻译', color: '#06b6d4', prompt: '请将以下文本翻译成流畅自然的中文：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+      { id: 'polish', name: '润色', color: '#8b5cf6', prompt: '请帮我润色改进以下文本，使表达更加流畅专业：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+      { id: 'analyze', name: '分析', color: '#f59e0b', prompt: '请从多个维度深度分析以下文本：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+      { id: 'chat', name: '对话', color: '#ec4899', prompt: '{{current_text}}', generateCard: false }
     ];
     return new Promise((resolve) => {
       chrome.storage.local.get(['templates'], (items) => {
@@ -67,7 +67,11 @@
   async function createTemplateBar(x, y, selectedText) {
     removeTemplateBar();
 
-    const templates = await getTemplates();
+    const allTemplates = await getTemplates();
+    // 过滤掉配置了"生成卡片"的模板（它们只在侧边栏显示）
+    const templates = allTemplates.filter(t => !t.generateCard);
+
+    if (templates.length === 0) return;
 
     if (templates.length <= 1) {
       // 单模板模式：按钮直接挂到 body，坐标设在按钮上
@@ -248,8 +252,13 @@
     const cursor = document.createElement('span');
     cursor.className = 'aicc-cursor';
 
-    // 将模板中的 {{Text}} 替换为用户选中的文本
-    const userPrompt = (template.prompt || '{{Text}}').replace(/\{\{Text\}\}/gi, selectedText);
+    // 替换模板变量：{{Text}}（兼容旧版）、{{current_text}}、{{current_url}}、{{current_page}}
+    let userPrompt = template.prompt || '{{current_text}}';
+    userPrompt = userPrompt.replace(/\{\{Text\}\}/gi, selectedText);
+    userPrompt = userPrompt.replace(/\{\{current_text\}\}/gi, selectedText);
+    userPrompt = userPrompt.replace(/\{\{current_url\}\}/gi, window.location.href);
+    const pageContent = (document.body?.innerText || '').substring(0, 15000);
+    userPrompt = userPrompt.replace(/\{\{current_page\}\}/gi, pageContent);
 
     const messages = [
       { role: 'user', content: userPrompt }

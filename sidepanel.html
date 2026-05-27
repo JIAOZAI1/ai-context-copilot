@@ -23,6 +23,14 @@
       </div>
     </header>
 
+    <!-- 模板卡片区 -->
+    <div id="template-cards-section" class="template-cards-section hidden">
+      <div class="template-cards-header">
+        <span class="template-cards-title">📋 提示词卡片</span>
+      </div>
+      <div id="template-cards-list" class="template-cards-list"></div>
+    </div>
+
     <!-- 消息列表 -->
     <div id="messages" class="messages">
       <div class="empty-state">
@@ -32,6 +40,25 @@
           粘贴页面内容或直接输入问题<br>
           支持多轮连续对话
         </p>
+      </div>
+    </div>
+
+    <!-- 模板表单弹窗 -->
+    <div id="template-form-overlay" class="template-form-overlay hidden">
+      <div class="template-form-card">
+        <div class="template-form-header">
+          <h3 id="template-form-title">填写提示词变量</h3>
+          <button id="template-form-close-btn" class="template-form-close-btn">✕</button>
+        </div>
+        <div id="template-form-body" class="template-form-body"></div>
+        <div id="template-form-preview" class="template-form-preview">
+          <div class="template-form-preview-header">📝 预览</div>
+          <div class="template-form-preview-content"></div>
+        </div>
+        <div class="template-form-actions">
+          <button id="template-form-cancel-btn" class="template-form-btn cancel">取消</button>
+          <button id="template-form-submit-btn" class="template-form-btn submit">发送给 AI</button>
+        </div>
       </div>
     </div>
 

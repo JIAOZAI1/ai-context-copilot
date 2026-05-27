@@ -106,7 +106,7 @@
       <!-- 提示词模板 -->
       <section class="card" id="templates-card">
         <h2 class="card-title" data-i18n="templateSectionTitle">📋 提示词模板</h2>
-        <p class="card-desc" data-i18n="templateSectionDesc">配置多个模板，选中网页文本后可选其一来调用 AI。{{Text}} 会被替换为选中的文本</p>
+        <p class="card-desc" data-i18n="templateSectionDesc">配置多个模板，选中网页文本后可选其一来调用 AI。可用变量：{{current_text}}（选中文本）、{{current_url}}（当前页面URL）、{{current_page}}（页面内容）、及自定义变量</p>
 
         <div id="templates-list"></div>
 

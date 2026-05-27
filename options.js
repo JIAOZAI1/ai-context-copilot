@@ -275,12 +275,12 @@
 
   // 默认模板使用 key 来存储翻译后的名称，实际名称会在 render 时根据语言计算
   const DEFAULT_TEMPLATES = [
-    { id: 'explain', name: '解释', color: '#6366f1', prompt: '请帮我详细解释以下文本的含义和背景：\n\n"""\n{{Text}}\n"""' },
-    { id: 'summarize', name: '总结', color: '#10b981', prompt: '请用简洁的要点列表总结以下文本的核心内容：\n\n"""\n{{Text}}\n"""' },
-    { id: 'translate', name: '翻译', color: '#06b6d4', prompt: '请将以下文本翻译成流畅自然的中文，保持原意和语气：\n\n"""\n{{Text}}\n"""' },
-    { id: 'polish', name: '润色', color: '#8b5cf6', prompt: '请帮我润色改进以下文本，修正语法错误，使表达更加流畅专业，但保持原意不变：\n\n"""\n{{Text}}\n"""' },
-    { id: 'analyze', name: '分析', color: '#f59e0b', prompt: '请从多个维度和视角深度分析以下文本，包括内容、结构、观点、论据等方面：\n\n"""\n{{Text}}\n"""' },
-    { id: 'chat', name: '对话', color: '#ec4899', prompt: '{{Text}}' }
+    { id: 'explain', name: '解释', color: '#6366f1', prompt: '请帮我详细解释以下文本的含义和背景：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+    { id: 'summarize', name: '总结', color: '#10b981', prompt: '请用简洁的要点列表总结以下文本的核心内容：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+    { id: 'translate', name: '翻译', color: '#06b6d4', prompt: '请将以下文本翻译成流畅自然的中文，保持原意和语气：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+    { id: 'polish', name: '润色', color: '#8b5cf6', prompt: '请帮我润色改进以下文本，修正语法错误，使表达更加流畅专业，但保持原意不变：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+    { id: 'analyze', name: '分析', color: '#f59e0b', prompt: '请从多个维度和视角深度分析以下文本，包括内容、结构、观点、论据等方面：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+    { id: 'chat', name: '对话', color: '#ec4899', prompt: '{{current_text}}', generateCard: false }
   ];
 
   // 默认模板的英文名称映射
@@ -317,7 +317,11 @@
   function renderTemplates() {
     const tplNamePlaceholder = t('templateNamePlaceholder');
     const tplPromptPlaceholder = t('templatePromptPlaceholder');
-    const tplVarHint = t('templateVarHint');
+    const tplVarHintText = t('templateVarHintCurrentText');
+    const tplVarHintUrl = t('templateVarHintCurrentUrl');
+    const tplVarHintPage = t('templateVarHintCurrentPage');
+    const cardLabel = t('templateCardLabel');
+    const cardHint = t('templateCardHint');
 
     if (templates.length === 0) {
       templatesList.innerHTML = `<div class="templates-empty">${t('templateEmpty')}</div>`;
@@ -346,8 +350,18 @@
           <textarea class="template-prompt-input" rows="2"
                     placeholder="${tplPromptPlaceholder}"
                     data-field="prompt" data-index="${i}">${escapeHtml(tpl.prompt)}</textarea>
-          <div class="template-var-hint">
-            <code>{<!-- -->{Text}}</code>${tplVarHint}
+          <div class="template-vars-hint">
+            <span><code>{<!-- -->{current_text}}</code>${tplVarHintText}</span>
+            <span><code>{<!-- -->{current_url}}</code>${tplVarHintUrl}</span>
+            <span><code>{<!-- -->{current_page}}</code>${tplVarHintPage}</span>
+          </div>
+          <div class="template-card-toggle">
+            <label class="toggle-label">
+              <input type="checkbox" class="card-toggle-checkbox" data-index="${i}"${tpl.generateCard ? ' checked' : ''}>
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">${cardLabel}</span>
+            </label>
+            <span class="toggle-hint">${cardHint}</span>
           </div>
         </div>
       `).join('');
@@ -419,6 +433,16 @@
         }
       });
     });
+
+    templatesList.querySelectorAll('.card-toggle-checkbox').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const idx = parseInt(cb.dataset.index);
+        if (idx >= 0 && idx < templates.length) {
+          templates[idx].generateCard = cb.checked;
+          saveTemplates();
+        }
+      });
+    });
   }
 
   function escapeHtml(str) {
@@ -434,7 +458,8 @@
       id: 'tpl_' + Date.now(),
       name: t('newTemplateName'),
       color: TEMPLATE_COLORS[templates.length % TEMPLATE_COLORS.length],
-      prompt: t('newTemplatePrompt')
+      prompt: t('newTemplatePrompt'),
+      generateCard: false
     });
     saveTemplates();
     renderTemplates();
