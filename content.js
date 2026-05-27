@@ -49,11 +49,11 @@
 
   async function getTemplates() {
     const defaults = [
-      { id: 'explain', name: '解释', color: '#6366f1', prompt: '请帮我详细解释以下文本的含义和背景：\n\n"""\n{{current_text}}\n"""', generateCard: false },
-      { id: 'summarize', name: '总结', color: '#10b981', prompt: '请用简洁的要点列表总结以下文本的核心内容：\n\n"""\n{{current_text}}\n"""', generateCard: false },
-      { id: 'translate', name: '翻译', color: '#06b6d4', prompt: '请将以下文本翻译成流畅自然的中文：\n\n"""\n{{current_text}}\n"""', generateCard: false },
-      { id: 'polish', name: '润色', color: '#8b5cf6', prompt: '请帮我润色改进以下文本，使表达更加流畅专业：\n\n"""\n{{current_text}}\n"""', generateCard: false },
-      { id: 'analyze', name: '分析', color: '#f59e0b', prompt: '请从多个维度深度分析以下文本：\n\n"""\n{{current_text}}\n"""', generateCard: false },
+      { id: 'explain', name: '解释', color: '#6366f1', prompt: '请帮我详细解释以下文本的含义和背景：\n\n{{current_text}}', generateCard: false },
+      { id: 'summarize', name: '总结', color: '#10b981', prompt: '请用简洁的要点列表总结以下文本的核心内容：\n\n{{current_text}}', generateCard: false },
+      { id: 'translate', name: '翻译', color: '#06b6d4', prompt: '请将以下文本翻译成流畅自然的中文：\n\n{{current_text}}', generateCard: false },
+      { id: 'polish', name: '润色', color: '#8b5cf6', prompt: '请帮我润色改进以下文本，使表达更加流畅专业：\n\n{{current_text}}', generateCard: false },
+      { id: 'analyze', name: '分析', color: '#f59e0b', prompt: '请从多个维度深度分析以下文本：\n\n{{current_text}}', generateCard: false },
       { id: 'chat', name: '对话', color: '#ec4899', prompt: '{{current_text}}', generateCard: false }
     ];
     return new Promise((resolve) => {

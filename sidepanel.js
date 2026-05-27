@@ -545,7 +545,7 @@
 
       const pageText = results?.[0]?.result?.trim();
       if (pageText) {
-        inputBox.value = `以下是我当前网页的文本内容，请帮我分析总结：\n\n"""\n${pageText}\n"""`;
+        inputBox.value = `以下是我当前网页的文本内容，请帮我分析总结：\n\n${pageText}`;
         inputBox.style.height = 'auto';
         inputBox.style.height = Math.min(inputBox.scrollHeight, 120) + 'px';
         inputBox.focus();
@@ -574,9 +574,9 @@
   // 监听来自 background 的消息
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'context-menu-query' && message.text) {
-      sendMessage(`请帮我解释以下文本：\n\n"""\n${message.text}\n"""`);
+      sendMessage(`请帮我解释以下文本：\n\n${message.text}`);
     } else if (message.type === 'query-from-page' && message.text) {
-      sendMessage(`请帮我解释以下文本（来自 ${message.pageUrl || '网页'}）：\n\n"""\n${message.text}\n"""`);
+      sendMessage(`请帮我解释以下文本（来自 ${message.pageUrl || '网页'}）：\n\n${message.text}`);
     }
   });
 
