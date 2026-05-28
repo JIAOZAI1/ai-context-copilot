@@ -57,9 +57,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           body: message.body
         });
         const text = await response.text();
-        sendResponse({ ok: response.ok, status: response.status, body: text });
+        try { sendResponse({ ok: response.ok, status: response.status, body: text }); } catch (_) {}
       } catch (err) {
-        sendResponse({ error: err.message });
+        try { sendResponse({ error: err.message }); } catch (_) {}
       }
     })();
     return true;
@@ -95,7 +95,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
           if (!response.ok) {
             const text = await response.text();
-            port.postMessage({ type: 'error', message: `HTTP ${response.status}: ${text.substring(0, 200)}` });
+            try { port.postMessage({ type: 'error', message: `HTTP ${response.status}: ${text.substring(0, 200)}` }); } catch (_) {}
             return;
           }
 
@@ -114,21 +114,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             for (const line of lines) {
               const trimmed = line.trim();
               if (trimmed) {
-                port.postMessage({ type: 'line', line: trimmed });
+                try { port.postMessage({ type: 'line', line: trimmed }); } catch (_) { return; }
               }
             }
           }
 
           if (buffer.trim()) {
-            port.postMessage({ type: 'line', line: buffer.trim() });
+            try { port.postMessage({ type: 'line', line: buffer.trim() }); } catch (_) {}
           }
 
-          port.postMessage({ type: 'done' });
+          try { port.postMessage({ type: 'done' }); } catch (_) {}
         } catch (err) {
           if (err.name === 'AbortError') {
-            port.postMessage({ type: 'done' });
+            try { port.postMessage({ type: 'done' }); } catch (_) {}
           } else {
-            port.postMessage({ type: 'error', message: err.message });
+            try { port.postMessage({ type: 'error', message: err.message }); } catch (_) {}
           }
         } finally {
           if (streamId != null) activeStreams.delete(streamId);

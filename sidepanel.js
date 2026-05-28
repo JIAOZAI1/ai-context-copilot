@@ -203,14 +203,19 @@
     updateFormPreview();
   }
 
+  function isRestrictedUrl(url) {
+    return url && (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('about:'));
+  }
+
   function tryGetSelectedText(callback) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
-      if (!tab) { callback(''); return; }
+      if (!tab || isRestrictedUrl(tab.url)) { callback(''); return; }
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => window.getSelection()?.toString()?.trim() || ''
       }, (results) => {
+        if (chrome.runtime.lastError) { callback(''); return; }
         callback(results?.[0]?.result || '');
       });
     });
@@ -219,11 +224,12 @@
   function tryGetPageContent(callback) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
-      if (!tab) { callback(''); return; }
+      if (!tab || isRestrictedUrl(tab.url)) { callback(''); return; }
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => (document.body?.innerText || '').substring(0, 15000)
       }, (results) => {
+        if (chrome.runtime.lastError) { callback(''); return; }
         callback(results?.[0]?.result || '');
       });
     });
@@ -535,6 +541,11 @@
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab) return;
+
+      if (isRestrictedUrl(tab.url)) {
+        inputBox.value = '（无法读取此类页面内容）';
+        return;
+      }
 
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },

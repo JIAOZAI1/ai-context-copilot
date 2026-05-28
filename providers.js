@@ -463,11 +463,16 @@ async function streamAIRequest(providerId, config, messages, onChunk, onDone, on
       }, { once: true });
     }
 
-    port.postMessage({
-      type: 'start',
-      url,
-      headers: provider.getHeaders(apiKey),
-      body: provider.buildBody(config.model, messages, true, config.maxTokens)
-    });
+    try {
+      port.postMessage({
+        type: 'start',
+        url,
+        headers: provider.getHeaders(apiKey),
+        body: provider.buildBody(config.model, messages, true, config.maxTokens)
+      });
+    } catch (err) {
+      onError(err);
+      finish();
+    }
   });
 }
